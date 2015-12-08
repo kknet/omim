@@ -26,6 +26,10 @@ Platform::Platform()
   string const bundlePath = [[[NSBundle mainBundle] bundlePath] UTF8String];
   if (resourcesPath == bundlePath)
   {
+#ifdef STANDALONE_APP
+    m_resourcesDir = resourcesPath + "/";
+    m_writableDir = m_resourcesDir;
+#else // STANDALONE_APP
     // we're the console app, probably unit test, and path is our directory
     m_resourcesDir = bundlePath + "/../../data/";
     if (!IsFileExistsByFullPath(m_resourcesDir))
@@ -38,11 +42,13 @@ Platform::Platform()
         m_resourcesDir = "./data/";
     }
     m_writableDir = m_resourcesDir;
+#endif // STANDALONE_APP
   }
   else
   {
+#ifdef STANDALONE_APP
     m_resourcesDir = resourcesPath + "/";
-
+#else // STANDALONE_APP
     // get writable path
     // developers can have symlink to data folder
     char const * dataPath = "../../../../../data/";
@@ -61,13 +67,18 @@ Platform::Platform()
           m_writableDir = m_resourcesDir.substr(0, p) + "/omim/data/";
       }
     }
+#endif // STANDALONE_APP
 
     if (m_writableDir.empty())
     {
       NSArray * dirPaths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
       NSString * supportDir = [dirPaths objectAtIndex:0];
       m_writableDir = [supportDir UTF8String];
+#ifdef BUILD_DESIGNER
+      m_writableDir += "/MAPS.ME.Designer/";
+#else // BUILD_DESIGNER
       m_writableDir += "/MapsWithMe/";
+#endif // BUILD_DESIGNER
       ::mkdir(m_writableDir.c_str(), 0755);
     }
   }

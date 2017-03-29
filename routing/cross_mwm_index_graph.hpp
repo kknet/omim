@@ -16,6 +16,7 @@
 
 #include "platform/country_file.hpp"
 
+#include "base/buffer_vector.hpp"
 #include "base/math.hpp"
 
 #include "defines.hpp"
@@ -89,6 +90,8 @@ public:
   void Clear();
 
 private:
+  using TransitionPoints = buffer_vector<m2::PointD, 1>;
+
   struct TransitionSegments
   {
     std::map<Segment, std::vector<ms::LatLon>> m_ingoing;
@@ -116,15 +119,15 @@ private:
   std::vector<ms::LatLon> const & GetIngoingTransitionPoints(Segment const & s);
   std::vector<ms::LatLon> const & GetOutgoingTransitionPoints(Segment const & s);
 
-  /// \returns points of |s|. |s| should be a transition segment of mwm with OSRM cross-mwm sections or
-  /// with index graph cross-mwm section.
+  /// \returns points of |s|. |s| should be a transition segment of mwm with an OSRM cross-mwm sections or
+  /// with an index graph cross-mwm section.
   /// \param s is a transition segment of type |isOutgoing|.
-  /// \note the result of the method is returned by value because the size of the vection is ussually one
+  /// \note the result of the method is returned by value because the size of the vector is ussually one
   /// or very small in rare cases in OSRM.
-  std::vector<m2::PointD> GetTransitionPoints(Segment const & s, bool isOutgoing);
+  TransitionPoints GetTransitionPoints(Segment const & s, bool isOutgoing);
 
   MwmValue & GetValue(NumMwmId numMwmId);
-  bool DoesCrossMwmSectionExist(NumMwmId numMwmId);
+  bool CrossMwmSectionExists(NumMwmId numMwmId);
 
   /// \brief Fills |twins| with transition segments of feature |ft| of type |isOutgoing|.
   void GetTransitions(FeatureType const & ft, bool isOutgoing, std::vector<Segment> & twins);
@@ -177,10 +180,10 @@ private:
 
   // Index graph cross-mwm information
   /// \note |m_crossMwmIndexGraph| contains cache with transition segments and leap edges.
-  /// Ever mwm in |m_crossMwmIndexGraph| may be in two conditions:
-  /// * with loaded transition segments (after call CrossMwmConnectorSerializer::DeserializeTransitions())
+  /// Each mwm in |m_crossMwmIndexGraph| may be in two conditions:
+  /// * with loaded transition segments (after a call to CrossMwmConnectorSerializer::DeserializeTransitions())
   /// * with loaded transition segments and with loaded weights
-  ///   (after call CrossMwmConnectorSerializer::DeserializeTransitions()
+  ///   (after a call to CrossMwmConnectorSerializer::DeserializeTransitions()
   ///   and CrossMwmConnectorSerializer::DeserializeWeights())
   std::map<NumMwmId, CrossMwmConnector> m_crossMwmIndexGraph;
 };

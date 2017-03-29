@@ -117,13 +117,6 @@ void AddSegmentEdge(NumMwmIds const & numMwmIds, OsrmFtSegMapping const & segMap
   edges.emplace_back(segment,
                      osrmEdge.GetWeight() * kOSRMWeightToSecondsMultiplier * kAstarHeuristicFactor);
 }
-
-m2::RectD GetMwmCrossingNodeEqualityRect(m2::PointD const & point)
-{
-  double constexpr kMwmCrossingNodeEqualityDegrees = kTransitionEqualityDistM * MercatorBounds::degreeInMetres;
-  return m2::RectD(point.x - kMwmCrossingNodeEqualityDegrees, point.y - kMwmCrossingNodeEqualityDegrees,
-                   point.x + kMwmCrossingNodeEqualityDegrees, point.y + kMwmCrossingNodeEqualityDegrees);
-}
 }  // namespace
 
 namespace routing
@@ -142,7 +135,7 @@ CrossMwmIndexGraph::~CrossMwmIndexGraph() {}
 bool CrossMwmIndexGraph::IsTransition(Segment const & s, bool isOutgoing)
 {
   // Index graph based cross-mwm information.
-  if (DoesCrossMwmSectionExist(s.GetMwmId()))
+  if (CrossMwmSectionExists(s.GetMwmId()))
   {
     CrossMwmConnector const & c = GetCrossMwmConnectorWithTransitions(s.GetMwmId());
     return c.IsTransition(s, isOutgoing);
@@ -171,14 +164,15 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
   // It's possible to implement a faster version for two special cases:
   // * all neighbouring mwms have cross_mwm section
   // * all neighbouring mwms have osrm cross mwm sections
-  vector<m2::PointD> const transitions = GetTransitionPoints(s, isOutgoing);
+  TransitionPoints const transitions = GetTransitionPoints(s, isOutgoing);
   for (m2::PointD const & p : transitions)
   {
     double constexpr kInvalidDistance = numeric_limits<double>::max();
-    bool exactConformityFound = false;
+    bool exactMatchFound = false;
     double minDistM = kInvalidDistance;
     Segment minDistTwinSeg;
-    m_index.ForEachInRect([&](FeatureType & ft){
+
+    auto const findBestTwins = [&](FeatureType & ft){
       if (ft.GetID().m_mwmId.GetInfo()->GetType() != MwmInfo::COUNTRY)
         return;
 
@@ -198,25 +192,29 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
       GetTransitions(ft, !isOutgoing, twinCandidates);
       for (Segment const & tc : twinCandidates)
       {
-        vector<m2::PointD> const twinPoints = GetTransitionPoints(tc, !isOutgoing);
+        TransitionPoints const twinPoints = GetTransitionPoints(tc, !isOutgoing);
         for (m2::PointD const & tp : twinPoints)
         {
           double const distM = MercatorBounds::DistanceOnEarth(p, tp);
           if (distM == 0.0)
           {
             twins.push_back(tc);
-            exactConformityFound = true;
+            exactMatchFound = true;
           }
-          if (!exactConformityFound && distM <= kTransitionEqualityDistM && distM < minDistM)
+          if (!exactMatchFound && distM <= kTransitionEqualityDistM && distM < minDistM)
           {
             minDistM = distM;
             minDistTwinSeg = tc;
           }
         }
       }
-    }, GetMwmCrossingNodeEqualityRect(p), scales::GetUpperScale());
+    };
 
-    if (!exactConformityFound && minDistM != kInvalidDistance)
+    m_index.ForEachInRect(findBestTwins,
+                          MercatorBounds::RectByCenterXYAndSizeInMeters(p, kTransitionEqualityDistM),
+                          scales::GetUpperScale());
+
+    if (!exactMatchFound && minDistM != kInvalidDistance)
       twins.push_back(minDistTwinSeg);
   }
 
@@ -249,7 +247,7 @@ void CrossMwmIndexGraph::GetEdgeList(Segment const & s, bool isOutgoing,
     return;
 
   // Index graph based cross-mwm information.
-  if (DoesCrossMwmSectionExist(s.GetMwmId()))
+  if (CrossMwmSectionExists(s.GetMwmId()))
   {
     CrossMwmConnector const & c = CrossMwmIndexGraph::GetCrossMwmConnectorWithWeights(s.GetMwmId());
     c.GetEdgeList(s, isOutgoing, edges);
@@ -385,7 +383,7 @@ CrossMwmIndexGraph::TransitionSegments const & CrossMwmIndexGraph::GetSegmentMap
 
 CrossMwmConnector const & CrossMwmIndexGraph::GetCrossMwmConnectorWithTransitions(NumMwmId numMwmId)
 {
-  ASSERT(DoesCrossMwmSectionExist(numMwmId), ());
+  ASSERT(CrossMwmSectionExists(numMwmId), ());
 
   auto const it = m_crossMwmIndexGraph.find(numMwmId);
   if (it != m_crossMwmIndexGraph.cend())
@@ -425,19 +423,19 @@ vector<ms::LatLon> const & CrossMwmIndexGraph::GetOutgoingTransitionPoints(Segme
   return it->second;
 }
 
-vector<m2::PointD> CrossMwmIndexGraph::GetTransitionPoints(Segment const & s, bool isOutgoing)
+CrossMwmIndexGraph::TransitionPoints CrossMwmIndexGraph::GetTransitionPoints(Segment const & s, bool isOutgoing)
 {
-  if (DoesCrossMwmSectionExist(s.GetMwmId()))
+  if (CrossMwmSectionExists(s.GetMwmId()))
   {
     CrossMwmConnector const & connectors = GetCrossMwmConnectorWithTransitions(s.GetMwmId());
     // In case of transition segments of index graph cross-mwm section the front point of segemnt
     // is used as a point which corresponds to the segment.
-    return vector<m2::PointD>({connectors.GetPoint(s, true /* front */)});
+    return TransitionPoints({connectors.GetPoint(s, true /* front */)});
   }
 
   vector<ms::LatLon> const & latLons = isOutgoing ? GetOutgoingTransitionPoints(s)
                                                   : GetIngoingTransitionPoints(s);
-  vector<m2::PointD> points;
+  TransitionPoints points;
   points.reserve(latLons.size());
   for (auto const & ll : latLons)
     points.push_back(MercatorBounds::FromLatLon(ll));
@@ -453,7 +451,7 @@ MwmValue & CrossMwmIndexGraph::GetValue(NumMwmId numMwmId)
   return *value;
 }
 
-bool CrossMwmIndexGraph::DoesCrossMwmSectionExist(NumMwmId numMwmId)
+bool CrossMwmIndexGraph::CrossMwmSectionExists(NumMwmId numMwmId)
 {
   if (m_crossMwmIndexGraph.count(numMwmId) != 0)
     return true;
@@ -465,7 +463,7 @@ void CrossMwmIndexGraph::GetTransitions(FeatureType const & ft, bool isOutgoing,
 {
   NumMwmId const numMwmId = m_numMwmIds->GetId(CountryFile(ft.GetID().GetMwmName()));
 
-  for (uint32_t segIdx = 0; segIdx < ft.GetPointsCount() - 1; ++segIdx)
+  for (uint32_t segIdx = 0; segIdx + 1 < ft.GetPointsCount(); ++segIdx)
   {
     Segment const segForward(numMwmId, ft.GetID().m_index, segIdx, true /* forward */);
     if (IsTransition(segForward, isOutgoing))

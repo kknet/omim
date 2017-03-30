@@ -164,8 +164,8 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
   // It's possible to implement a faster version for two special cases:
   // * all neighboring mwms have cross_mwm section
   // * all neighboring mwms have osrm cross mwm sections
-  TransitionPoints const transitions = GetTransitionPoints(s, isOutgoing);
-  for (m2::PointD const & p : transitions)
+  TransitionPoints const points = GetTransitionPoints(s, isOutgoing);
+  for (m2::PointD const & p : points)
   {
     double constexpr kInvalidDistance = numeric_limits<double>::max();
     bool exactMatchFound = false;
@@ -176,18 +176,19 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
       if (ft.GetID().m_mwmId.GetInfo()->GetType() != MwmInfo::COUNTRY)
         return;
 
-      string const mwmName = ft.GetID().GetMwmName();
-      if (mwmName == FeatureID::kInvalidFileName)
+      if (!ft.GetID().IsValid())
         return;
 
-      NumMwmId const numMwmId = m_numMwmIds->GetId(CountryFile(mwmName));
+      NumMwmId const numMwmId = m_numMwmIds->GetId(ft.GetID().m_mwmId.
+                                                   GetInfo()->GetLocalFile().GetCountryFile());
       if (numMwmId == s.GetMwmId())
         return;
 
-      ft.ParseGeometry(FeatureType::BEST_GEOMETRY);
-      if (!m_vehicleModelFactory->GetVehicleModelForCountry(mwmName)->IsRoad(ft))
+      ft.ParseHeader2();
+      if (!m_vehicleModelFactory->GetVehicleModelForCountry(ft.GetID().GetMwmName())->IsRoad(ft))
         return;
 
+      ft.ParseGeometry(FeatureType::BEST_GEOMETRY);
       vector<Segment> twinCandidates;
       GetTransitions(ft, !isOutgoing, twinCandidates);
       for (Segment const & tc : twinCandidates)
@@ -395,11 +396,7 @@ CrossMwmConnector const & CrossMwmIndexGraph::GetCrossMwmConnectorWithTransition
 
 CrossMwmConnector const & CrossMwmIndexGraph::GetCrossMwmConnectorWithWeights(NumMwmId numMwmId)
 {
-  GetCrossMwmConnectorWithTransitions(numMwmId);
-
-  auto const it = m_crossMwmIndexGraph.find(numMwmId);
-  CHECK(it != m_crossMwmIndexGraph.cend(), ());
-  CrossMwmConnector const & c = it->second;
+  CrossMwmConnector const & c = GetCrossMwmConnectorWithTransitions(numMwmId);
   if (c.WeightsWereLoaded())
     return c;
 
@@ -427,10 +424,10 @@ CrossMwmIndexGraph::TransitionPoints CrossMwmIndexGraph::GetTransitionPoints(Seg
 {
   if (CrossMwmSectionExists(s.GetMwmId()))
   {
-    CrossMwmConnector const & connectors = GetCrossMwmConnectorWithTransitions(s.GetMwmId());
-    // In case of transition segments of index graph cross-mwm section the front point of segemnt
+    CrossMwmConnector const & connector = GetCrossMwmConnectorWithTransitions(s.GetMwmId());
+    // In case of transition segments of index graph cross-mwm section the front point of segment
     // is used as a point which corresponds to the segment.
-    return TransitionPoints({connectors.GetPoint(s, true /* front */)});
+    return TransitionPoints({connector.GetPoint(s, true /* front */)});
   }
 
   vector<ms::LatLon> const & latLons = isOutgoing ? GetOutgoingTransitionPoints(s)
@@ -442,24 +439,17 @@ CrossMwmIndexGraph::TransitionPoints CrossMwmIndexGraph::GetTransitionPoints(Seg
   return points;
 }
 
-MwmValue & CrossMwmIndexGraph::GetValue(NumMwmId numMwmId)
-{
-  MwmSet::MwmHandle const & handle = m_index.GetMwmHandleByCountryFile(m_numMwmIds->GetFile(numMwmId));
-  CHECK(handle.IsAlive(), ());
-  MwmValue * value = handle.GetValue<MwmValue>();
-  CHECK(value != nullptr, ("Country file:", m_numMwmIds->GetFile(numMwmId)));
-  return *value;
-}
-
 bool CrossMwmIndexGraph::CrossMwmSectionExists(NumMwmId numMwmId)
 {
   if (m_crossMwmIndexGraph.count(numMwmId) != 0)
     return true;
 
-  return GetValue(numMwmId).m_cont.IsExist(CROSS_MWM_FILE_TAG);
+  MwmValue * value = m_index.GetMwmHandleByCountryFile(m_numMwmIds->GetFile(numMwmId)).GetValue<MwmValue>();
+  CHECK(value != nullptr, ("Country file:", m_numMwmIds->GetFile(numMwmId)));
+  return value->m_cont.IsExist(CROSS_MWM_FILE_TAG);
 }
 
-void CrossMwmIndexGraph::GetTransitions(FeatureType const & ft, bool isOutgoing, vector<Segment> & transitions)
+void CrossMwmIndexGraph::GetTransitions(FeatureType const & ft, bool isOutgoing, vector<Segment> & points)
 {
   NumMwmId const numMwmId = m_numMwmIds->GetId(CountryFile(ft.GetID().GetMwmName()));
 
@@ -467,14 +457,14 @@ void CrossMwmIndexGraph::GetTransitions(FeatureType const & ft, bool isOutgoing,
   {
     Segment const segForward(numMwmId, ft.GetID().m_index, segIdx, true /* forward */);
     if (IsTransition(segForward, isOutgoing))
-      transitions.push_back(segForward);
+      points.push_back(segForward);
 
     if (m_vehicleModelFactory->GetVehicleModelForCountry(ft.GetID().GetMwmName())->IsOneWay(ft))
       return;
 
     Segment const segBackward(numMwmId, ft.GetID().m_index, segIdx, false /* forward */);
     if (IsTransition(segBackward, isOutgoing))
-      transitions.push_back(segBackward);
+      points.push_back(segBackward);
   }
 }
 }  // namespace routing

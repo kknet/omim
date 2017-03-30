@@ -122,11 +122,10 @@ private:
   /// \returns points of |s|. |s| should be a transition segment of mwm with an OSRM cross-mwm sections or
   /// with an index graph cross-mwm section.
   /// \param s is a transition segment of type |isOutgoing|.
-  /// \note the result of the method is returned by value because the size of the vector is ussually one
+  /// \note the result of the method is returned by value because the size of the vector is usually one
   /// or very small in rare cases in OSRM.
   TransitionPoints GetTransitionPoints(Segment const & s, bool isOutgoing);
 
-  MwmValue & GetValue(NumMwmId numMwmId);
   bool CrossMwmSectionExists(NumMwmId numMwmId);
 
   /// \brief Fills |twins| with transition segments of feature |ft| of type |isOutgoing|.
@@ -156,8 +155,10 @@ private:
   template <class Fn>
   CrossMwmConnector const & Deserialize(NumMwmId numMwmId, Fn && fn)
   {
-    std::unique_ptr<FilesContainerR::TReader> reader =
-        make_unique<FilesContainerR::TReader>(GetValue(numMwmId).m_cont.GetReader(CROSS_MWM_FILE_TAG));
+    MwmValue * value = m_index.GetMwmHandleByCountryFile(m_numMwmIds->GetFile(numMwmId)).GetValue<MwmValue>();
+    CHECK(value != nullptr, ("Country file:", m_numMwmIds->GetFile(numMwmId)));
+
+    auto const reader = make_unique<FilesContainerR::TReader>(value->m_cont.GetReader(CROSS_MWM_FILE_TAG));
     ReaderSource<FilesContainerR::TReader> src(*reader);
     auto const p = m_crossMwmIndexGraph.emplace(numMwmId, CrossMwmConnector(numMwmId));
     fn(VehicleType::Car, p.first->second, src);
@@ -178,7 +179,7 @@ private:
   std::map<NumMwmId, TransitionSegments> m_transitionCache;
   std::map<NumMwmId, std::unique_ptr<MappingGuard>> m_mappingGuards;
 
-  // Index graph cross-mwm information
+  // Index graph cross-mwm information.
   /// \note |m_crossMwmIndexGraph| contains cache with transition segments and leap edges.
   /// Each mwm in |m_crossMwmIndexGraph| may be in two conditions:
   /// * with loaded transition segments (after a call to CrossMwmConnectorSerializer::DeserializeTransitions())

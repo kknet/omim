@@ -22,11 +22,11 @@ namespace
 {
 struct NodeIds
 {
+  static double constexpr kTransitionEqualityDistM = 20.0;
+
   TOsrmNodeId m_directNodeId;
   TOsrmNodeId m_reverseNodeId;
 };
-
-double constexpr kTransitionEqualityDistM = 20.0;
 
 /// \returns FtSeg by |segment|.
 OsrmMappingTypes::FtSeg GetFtSeg(Segment const & segment)
@@ -162,8 +162,8 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
   // Note. The code below looks for twins based on geometry index. This code works for
   // any combination mwms with different cross mwm sections.
   // It's possible to implement a faster version for two special cases:
-  // * all neighbouring mwms have cross_mwm section
-  // * all neighbouring mwms have osrm cross mwm sections
+  // * all neighboring mwms have cross_mwm section
+  // * all neighboring mwms have osrm cross mwm sections
   TransitionPoints const transitions = GetTransitionPoints(s, isOutgoing);
   for (m2::PointD const & p : transitions)
   {
@@ -201,7 +201,7 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
             twins.push_back(tc);
             exactMatchFound = true;
           }
-          if (!exactMatchFound && distM <= kTransitionEqualityDistM && distM < minDistM)
+          if (!exactMatchFound && distM <= NodeIds::kTransitionEqualityDistM && distM < minDistM)
           {
             minDistM = distM;
             minDistTwinSeg = tc;
@@ -211,7 +211,7 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
     };
 
     m_index.ForEachInRect(findBestTwins,
-                          MercatorBounds::RectByCenterXYAndSizeInMeters(p, kTransitionEqualityDistM),
+                          MercatorBounds::RectByCenterXYAndSizeInMeters(p, NodeIds::kTransitionEqualityDistM),
                           scales::GetUpperScale());
 
     if (!exactMatchFound && minDistM != kInvalidDistance)

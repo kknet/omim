@@ -168,10 +168,20 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
   for (m2::PointD const & p : points)
   {
     double constexpr kInvalidDistance = numeric_limits<double>::max();
-    bool exactMatchFound = false;
-    double minDistM = kInvalidDistance;
-    Segment minDistTwinSeg;
+    struct ClosestSegment
+    {
+      ClosestSegment() = default;
+      ClosestSegment(double minDistM, Segment const & minDistTwinSeg, bool exactMatchFound)
+        : m_minDistM(minDistM), m_minDistTwinSeg(minDistTwinSeg), m_exactMatchFound(exactMatchFound) {}
 
+      double m_minDistM = kInvalidDistance;
+      Segment m_minDistTwinSeg;
+      bool m_exactMatchFound = false;
+    };
+
+    // Node. The map below is necessary because twin segments could belong to several mwm.
+    // It happens when a segment crosses more than one feature.
+    map<NumMwmId, ClosestSegment> minDistSegs;
     auto const findBestTwins = [&](FeatureType & ft){
       if (ft.GetID().m_mwmId.GetInfo()->GetType() != MwmInfo::COUNTRY)
         return;
@@ -200,12 +210,14 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
           if (distM == 0.0)
           {
             twins.push_back(tc);
-            exactMatchFound = true;
+            minDistSegs[numMwmId].m_exactMatchFound = true;
           }
-          if (!exactMatchFound && distM <= NodeIds::kTransitionEqualityDistM && distM < minDistM)
+          if (!minDistSegs[numMwmId].m_exactMatchFound
+              && distM <= NodeIds::kTransitionEqualityDistM
+              && distM < minDistSegs[numMwmId].m_minDistM)
           {
-            minDistM = distM;
-            minDistTwinSeg = tc;
+            minDistSegs[numMwmId].m_minDistM = distM;
+            minDistSegs[numMwmId].m_minDistTwinSeg = tc;
           }
         }
       }
@@ -215,8 +227,14 @@ void CrossMwmIndexGraph::GetTwins(Segment const & s, bool isOutgoing, vector<Seg
                           MercatorBounds::RectByCenterXYAndSizeInMeters(p, NodeIds::kTransitionEqualityDistM),
                           scales::GetUpperScale());
 
-    if (!exactMatchFound && minDistM != kInvalidDistance)
-      twins.push_back(minDistTwinSeg);
+    for (auto const & kv : minDistSegs)
+    {
+      if (kv.second.m_exactMatchFound)
+        continue;
+      if (kv.second.m_minDistM == kInvalidDistance)
+        continue;
+      twins.push_back(kv.second.m_minDistTwinSeg);
+    }
   }
 
   my::SortUnique(twins);

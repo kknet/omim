@@ -131,7 +131,7 @@ private:
   /// \brief Fills |twins| with transition segments of feature |ft| of type |isOutgoing|.
   void GetTransitions(FeatureType const & ft, bool isOutgoing, std::vector<Segment> & twins);
 
-  template <class Fn>
+  template <typename Fn>
   bool LoadWith(NumMwmId numMwmId, Fn && fn)
   {
     platform::CountryFile const & countryFile = m_numMwmIds->GetFile(numMwmId);
@@ -152,7 +152,7 @@ private:
     return true;
   }
 
-  template <class Fn>
+  template <typename Fn>
   CrossMwmConnector const & Deserialize(NumMwmId numMwmId, Fn && fn)
   {
     MwmValue * value = m_index.GetMwmHandleByCountryFile(m_numMwmIds->GetFile(numMwmId)).GetValue<MwmValue>();

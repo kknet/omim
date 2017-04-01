@@ -1,6 +1,8 @@
 #pragma once
 #include "routing/cross_mwm_connector.hpp"
 #include "routing/cross_mwm_connector_serialization.hpp"
+#include "routing/cross_mwm_index_graph.hpp"
+#include "routing/cross_mwm_osrm_graph.hpp"
 #include "routing/num_mwm_id.hpp"
 #include "routing/routing_mapping.hpp"
 #include "routing/segment.hpp"

@@ -31,12 +31,12 @@ struct BorderCross;
 class CrossMwmRoadGraph;
 
 /// \brief Getting information for cross mwm routing.
-class CrossMwmIndexGraph final
+class CrossMwmGraph final
 {
 public:
-  CrossMwmIndexGraph(Index & index, std::shared_ptr<NumMwmIds> numMwmIds,
-                     std::shared_ptr<VehicleModelFactory> vehicleModelFactory, RoutingIndexManager & indexManager);
-  ~CrossMwmIndexGraph();
+  CrossMwmGraph(Index & index, std::shared_ptr<NumMwmIds> numMwmIds,
+                std::shared_ptr<VehicleModelFactory> vehicleModelFactory, RoutingIndexManager & indexManager);
+  ~CrossMwmGraph();
 
   /// \brief Transition segment is a segment which is crossed by mwm border. That means
   /// start and finsh of such segment have to lie in different mwms. If a segment is
@@ -173,7 +173,7 @@ private:
   RoutingIndexManager & m_indexManager;
   /// \note According to the constructor CrossMwmRoadGraph is initialized with RoutingIndexManager &.
   /// But then it is copied by value to CrossMwmRoadGraph::RoutingIndexManager m_indexManager.
-  /// It means that there're two copies of RoutingIndexManager in CrossMwmIndexGraph.
+  /// It means that there're two copies of RoutingIndexManager in CrossMwmGraph.
   std::unique_ptr<CrossMwmRoadGraph> m_crossMwmGraph;
 
   std::map<NumMwmId, TransitionSegments> m_transitionCache;

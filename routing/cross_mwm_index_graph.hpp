@@ -28,7 +28,7 @@
 namespace routing
 {
 struct BorderCross;
-class CrossMwmGraph;
+class CrossMwmRoadGraph;
 
 /// \brief Getting information for cross mwm routing.
 class CrossMwmIndexGraph final
@@ -171,10 +171,10 @@ private:
 
   // OSRM based cross-mwm information.
   RoutingIndexManager & m_indexManager;
-  /// \note According to the constructor CrossMwmGraph is initialized with RoutingIndexManager &.
-  /// But then it is copied by value to CrossMwmGraph::RoutingIndexManager m_indexManager.
+  /// \note According to the constructor CrossMwmRoadGraph is initialized with RoutingIndexManager &.
+  /// But then it is copied by value to CrossMwmRoadGraph::RoutingIndexManager m_indexManager.
   /// It means that there're two copies of RoutingIndexManager in CrossMwmIndexGraph.
-  std::unique_ptr<CrossMwmGraph> m_crossMwmGraph;
+  std::unique_ptr<CrossMwmRoadGraph> m_crossMwmGraph;
 
   std::map<NumMwmId, TransitionSegments> m_transitionCache;
   std::map<NumMwmId, std::unique_ptr<MappingGuard>> m_mappingGuards;

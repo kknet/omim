@@ -304,7 +304,7 @@ void CrossMwmIndexGraph::Clear()
 
 void CrossMwmIndexGraph::ResetCrossMwmGraph()
 {
-  m_crossMwmGraph = make_unique<CrossMwmGraph>(m_indexManager);
+  m_crossMwmGraph = make_unique<CrossMwmRoadGraph>(m_indexManager);
 }
 
 void CrossMwmIndexGraph::InsertWholeMwmTransitionSegments(NumMwmId numMwmId)

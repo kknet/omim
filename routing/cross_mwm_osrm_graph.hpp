@@ -18,6 +18,8 @@ namespace routing
 struct BorderCross;
 class CrossMwmRoadGraph;
 
+using TransitionPoints = buffer_vector<m2::PointD, 1>;
+
 class CrossMwmOsrmGraph final
 {
 public:
@@ -27,10 +29,7 @@ public:
   bool IsTransition(Segment const & s, bool isOutgoing);
   void GetEdgeList(Segment const & s, bool isOutgoing, std::vector<SegmentEdge> & edges);
   void Clear();
-  void ResetCrossMwmGraph();
-
-  std::vector<ms::LatLon> const & GetIngoingTransitionPoints(Segment const & s);
-  std::vector<ms::LatLon> const & GetOutgoingTransitionPoints(Segment const & s);
+  TransitionPoints GetTransitionPoints(Segment const & s, bool isOutgoing);
 
 private:
   struct TransitionSegments
@@ -40,8 +39,9 @@ private:
   };
 
   /// \brief Inserts all ingoing and outgoing transition segments of mwm with |numMwmId|
-  /// to |m_transitionCache|. It works for OSRM cross-mwm section.
-  void InsertWholeMwmTransitionSegments(NumMwmId numMwmId);
+  /// to |m_transitionCache|. It works for OSRM section.
+  /// \returns Reference to TransitionSegments corresponded to |numMwmId|.
+  TransitionSegments const & LoadSegmentMaps(NumMwmId numMwmId);
 
   /// \brief Fills |borderCrosses| of mwm with |mapping| according to |s|.
   /// \param mapping if |isOutgoing| == true |mapping| is mapping ingoing (from) border cross.
@@ -52,6 +52,8 @@ private:
                       std::vector<BorderCross> & borderCrosses);
 
   TransitionSegments const & GetSegmentMaps(NumMwmId numMwmId);
+  std::vector<ms::LatLon> const & GetIngoingTransitionPoints(Segment const & s);
+  std::vector<ms::LatLon> const & GetOutgoingTransitionPoints(Segment const & s);
 
   template <typename Fn>
   bool LoadWith(NumMwmId numMwmId, Fn && fn)

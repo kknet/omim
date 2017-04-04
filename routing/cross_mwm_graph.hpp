@@ -23,7 +23,6 @@ class CrossMwmGraph final
 public:
   CrossMwmGraph(Index & index, std::shared_ptr<NumMwmIds> numMwmIds,
                 std::shared_ptr<VehicleModelFactory> vehicleModelFactory, RoutingIndexManager & indexManager);
-  ~CrossMwmGraph();
 
   /// \brief Transition segment is a segment which is crossed by mwm border. That means
   /// start and finsh of such segment have to lie in different mwms. If a segment is
@@ -77,8 +76,6 @@ public:
   void Clear();
 
 private:
-  using TransitionPoints = buffer_vector<m2::PointD, 1>;
-
   /// \returns points of |s|. |s| should be a transition segment of mwm with an OSRM cross-mwm sections or
   /// with an index graph cross-mwm section.
   /// \param s is a transition segment of type |isOutgoing|.
@@ -89,7 +86,7 @@ private:
   bool CrossMwmSectionExists(NumMwmId numMwmId);
 
   /// \brief Fills |twins| with transition segments of feature |ft| of type |isOutgoing|.
-  void GetTransitions(FeatureType const & ft, bool isOutgoing, std::vector<Segment> & twins);
+  void GetTwinCandidates(FeatureType const & ft, bool isOutgoing, std::vector<Segment> & twinCandidates);
 
   Index & m_index;
   std::shared_ptr<NumMwmIds> m_numMwmIds;

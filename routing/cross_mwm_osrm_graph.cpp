@@ -110,7 +110,7 @@ namespace routing
 CrossMwmOsrmGraph::CrossMwmOsrmGraph(shared_ptr<NumMwmIds> numMwmIds, RoutingIndexManager & indexManager)
   : m_numMwmIds(numMwmIds), m_indexManager(indexManager)
 {
-  ResetCrossMwmGraph();
+  Clear();
 }
 
 CrossMwmOsrmGraph::~CrossMwmOsrmGraph() {}
@@ -150,20 +150,28 @@ void CrossMwmOsrmGraph::GetEdgeList(Segment const & s, bool isOutgoing,
 
 void CrossMwmOsrmGraph::Clear()
 {
-  ResetCrossMwmGraph();
+  m_crossMwmGraph = make_unique<CrossMwmRoadGraph>(m_indexManager);
   m_transitionCache.clear();
   m_mappingGuards.clear();
 }
 
-void CrossMwmOsrmGraph::ResetCrossMwmGraph()
+TransitionPoints CrossMwmOsrmGraph::GetTransitionPoints(Segment const & s, bool isOutgoing)
 {
-  m_crossMwmGraph = make_unique<CrossMwmRoadGraph>(m_indexManager);
+  vector<ms::LatLon> const & latLons = isOutgoing ? GetOutgoingTransitionPoints(s)
+                                                  : GetIngoingTransitionPoints(s);
+  TransitionPoints points;
+  points.reserve(latLons.size());
+  for (auto const & latLon : latLons)
+    points.push_back(MercatorBounds::FromLatLon(latLon));
+  return points;
 }
 
-void CrossMwmOsrmGraph::InsertWholeMwmTransitionSegments(NumMwmId numMwmId)
+CrossMwmOsrmGraph::TransitionSegments const & CrossMwmOsrmGraph::LoadSegmentMaps(NumMwmId numMwmId)
 {
-  if (m_transitionCache.count(numMwmId) != 0)
-    return;
+  //map<NumMwmId, TransitionSegments>::iterator
+  auto it = m_transitionCache.find(numMwmId);
+  if (it != m_transitionCache.cend())
+    return it->second;
 
   auto const fillAllTransitionSegments = [&](TRoutingMappingPtr const & mapping) {
     TransitionSegments transitionSegments;
@@ -181,10 +189,12 @@ void CrossMwmOsrmGraph::InsertWholeMwmTransitionSegments(NumMwmId numMwmId)
     UNUSED_VALUE(p);
     ASSERT(p.second, ("Mwm num id:", numMwmId, "has been inserted before. Country file name:",
                       mapping->GetCountryName()));
+    it = p.first;
   };
 
   if (!LoadWith(numMwmId, fillAllTransitionSegments))
-    m_transitionCache.emplace(numMwmId, TransitionSegments());
+    it = m_transitionCache.emplace(numMwmId, TransitionSegments()).first;
+  return it->second;
 }
 
 void CrossMwmOsrmGraph::GetBorderCross(TRoutingMappingPtr const & mapping, Segment const & s,
@@ -219,10 +229,8 @@ CrossMwmOsrmGraph::TransitionSegments const & CrossMwmOsrmGraph::GetSegmentMaps(
 {
   auto it = m_transitionCache.find(numMwmId);
   if (it == m_transitionCache.cend())
-  {
-    InsertWholeMwmTransitionSegments(numMwmId);
-    it = m_transitionCache.find(numMwmId);
-  }
+    return LoadSegmentMaps(numMwmId);
+
   CHECK(it != m_transitionCache.cend(), ("Mwm ", numMwmId, "has not been downloaded."));
   return it->second;
 }

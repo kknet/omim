@@ -28,8 +28,10 @@ public:
   void Clear() { m_connectors.clear(); }
 
   CrossMwmConnector const & GetCrossMwmConnectorWithTransitions(NumMwmId numMwmId);
-  CrossMwmConnector const & GetCrossMwmConnectorWithWeights(NumMwmId numMwmId);
   bool HasCache(NumMwmId numMwmId) const { return m_connectors.count(numMwmId) != 0; }
+
+private:
+  CrossMwmConnector const & GetCrossMwmConnectorWithWeights(NumMwmId numMwmId);
 
   template <typename Fn>
   CrossMwmConnector const & Deserialize(NumMwmId numMwmId, Fn && fn)
@@ -44,7 +46,6 @@ public:
     return p.first->second;
   }
 
-private:
   Index & m_index;
   std::shared_ptr<NumMwmIds> m_numMwmIds;
 
